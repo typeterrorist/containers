@@ -1,0 +1,4 @@
+name: containers
+include: src
+  agda-unimath/src
+flags: --without-K --no-import-sorts
