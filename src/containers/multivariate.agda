@@ -11,6 +11,7 @@ open import foundation.functoriality-dependent-pair-types
 open import foundation.homotopies
 open import foundation.identity-types
 open import foundation.structure-identity-principle
+open import foundation.subtypes
 open import foundation.transport-along-identifications
 open import foundation.univalence
 open import foundation.universe-levels
@@ -181,14 +182,58 @@ record LinearMorphism {I : UU ℓ₁}
 
 module _ {I : UU ℓ₁} where
 
+  Σ-LinearMorphism : Container ℓ₂ ℓ₃ I
+                   → Container ℓ₄ ℓ₅ I
+                   → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄ ⊔ ℓ₅)
+  Σ-LinearMorphism (S ◁ P) (T ◁ Q) =
+    Σ (S → T) λ f → ∀ s i → Q (f s) i ≃ P s i
+
+  LinearMorphism≃Σ-LinearMorphism : {C : Container ℓ₂ ℓ₃ I}
+                                  → {D : Container ℓ₄ ℓ₅ I}
+                                  → LinearMorphism C D ≃ Σ-LinearMorphism C D
+  pr1 LinearMorphism≃Σ-LinearMorphism
+    record { on-shapes = f ; on-positions = σ } = (f , σ)
+  pr2 LinearMorphism≃Σ-LinearMorphism =
+    is-equiv-is-invertible
+      (λ (f , σ) → record { on-shapes = f ; on-positions = σ })
+      refl-htpy
+      refl-htpy
+
+module _ {I : UU ℓ₁} where
+
   _⇴_ : Container ℓ₂ ℓ₃ I → Container ℓ₄ ℓ₅ I
       → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄ ⊔ ℓ₅)
   _⇴_ = LinearMorphism
 
-  ⌊_⌋ : {C : Container ℓ₂ ℓ₃ I} {D : Container ℓ₄ ℓ₅ I}
-      → C ⇴ D → C ⇒ D
+module _ {I : UU ℓ₁}
+  {C : Container ℓ₂ ℓ₃ I} {D : Container ℓ₄ ℓ₅ I}
+  where
+
+  ⌊_⌋ : C ⇴ D → C ⇒ D
   Morphism.on-shapes ⌊ η ⌋ = LinearMorphism.on-shapes η
   Morphism.on-positions ⌊ η ⌋ s i = map-equiv (LinearMorphism.on-positions η s i)
+
+  is-emb-⌊⌋ : is-emb ⌊_⌋
+  is-emb-⌊⌋ =
+    is-emb-comp
+      (map-inv-equiv Morphism≃Σ-Morphism)
+      (tot (λ f → map-Π (λ s → map-Π (λ i → map-equiv)))
+        ∘ map-equiv LinearMorphism≃Σ-LinearMorphism)
+      (is-emb-is-equiv
+        (pr2 (inv-equiv Morphism≃Σ-Morphism)))
+      (is-emb-comp
+        (tot (λ f → map-Π (λ s → map-Π (λ i → map-equiv))))
+        (map-equiv LinearMorphism≃Σ-LinearMorphism)
+        (is-emb-tot (λ f →
+          is-emb-map-Π (λ s →
+            is-emb-map-Π (λ i →
+              is-emb-inclusion-subtype is-equiv-Prop))))
+        (is-emb-is-equiv
+          (pr2 LinearMorphism≃Σ-LinearMorphism)))
+
+  emb-⌊_⌋ : (C ⇴ D) ↪ (C ⇒ D)
+  pr1 emb-⌊_⌋ = ⌊_⌋
+  pr2 emb-⌊_⌋ = is-emb-⌊⌋
 
 {- Equivalence of containers -}
 
