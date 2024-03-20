@@ -16,6 +16,7 @@ open import foundation.structure-identity-principle
 open import foundation.transport-along-identifications
 open import foundation.univalence
 open import foundation.universe-levels
+open import foundation.whiskering-homotopies
 
 module containers.univariate where
 
@@ -58,8 +59,76 @@ record Morphism (C : Container ℓ₁ ℓ₂) (D : Container ℓ₃ ℓ₄) :
     on-shapes : Shape C → Shape D
     on-positions : ∀ s → Position D (on-shapes s) → Position C s
 
-_⇒_ : Container ℓ₁ ℓ₂ → Container ℓ₃ ℓ₄ → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄)
+Σ-Morphism : Container ℓ₁ ℓ₂
+           → Container ℓ₃ ℓ₄
+           → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄)
+Σ-Morphism (S ◁ P) (T ◁ Q) =
+  Σ (S → T) λ f → ∀ s → Q (f s) → P s
+
+Morphism≃Σ-Morphism : {C : Container ℓ₁ ℓ₂}
+                    → {D : Container ℓ₃ ℓ₄}
+                    → Morphism C D ≃ Σ-Morphism C D
+pr1 Morphism≃Σ-Morphism
+  record { on-shapes = f ; on-positions = σ } = (f , σ)
+pr2 Morphism≃Σ-Morphism =
+  is-equiv-is-invertible
+    (λ (f , σ) → record { on-shapes = f ; on-positions = σ })
+    refl-htpy
+    refl-htpy
+
+_⇒_ : Container ℓ₁ ℓ₂
+    → Container ℓ₃ ℓ₄
+    → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄)
 _⇒_ = Morphism
+
+{- Equality on morphisms -}
+
+record MorphismEquality {C : Container ℓ₁ ℓ₂} {D : Container ℓ₃ ℓ₄}
+  (η γ : Morphism C D) : UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄) where
+  field
+    htpy-on-shapes : Morphism.on-shapes η ~ Morphism.on-shapes γ
+    htpy-on-positions : ∀ s
+                      → Morphism.on-positions η s
+                      ~ Morphism.on-positions γ s ∘ tr (Position D) (htpy-on-shapes s)
+
+Σ-MorphismEquality : {C : Container ℓ₁ ℓ₂} {D : Container ℓ₃ ℓ₄}
+                   → Morphism C D
+                   → Morphism C D
+                   → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄)
+Σ-MorphismEquality {D = D} η γ =
+  Σ (Morphism.on-shapes η ~ Morphism.on-shapes γ) (λ H →
+    ∀ s → Morphism.on-positions η s
+        ~ Morphism.on-positions γ s ∘ tr (Position D) (H s))
+
+MorphismEquality≃Σ-MorphismEquality : {C : Container ℓ₁ ℓ₂} {D : Container ℓ₃ ℓ₄}
+                                    → {η γ : Morphism C D}
+                                    → MorphismEquality η γ
+                                    ≃ Σ-MorphismEquality η γ
+pr1 MorphismEquality≃Σ-MorphismEquality
+  record { htpy-on-shapes = H ; htpy-on-positions = K } = (H , K)
+pr2 MorphismEquality≃Σ-MorphismEquality =
+  is-equiv-is-invertible
+    (λ (H , K) → record { htpy-on-shapes = H ; htpy-on-positions = K })
+    refl-htpy
+    refl-htpy
+
+Id≃MorphismEquality : {C : Container ℓ₁ ℓ₂} {D : Container ℓ₃ ℓ₄}
+                    → {η γ : Morphism C D}
+                    → (η ＝ γ)
+                    ≃ MorphismEquality η γ
+Id≃MorphismEquality {D = D} {η = η} {γ = γ} =
+  inv-equiv MorphismEquality≃Σ-MorphismEquality ∘e
+  extensionality-Σ
+    (λ σ H → ∀ s → Morphism.on-positions η s ~ σ s ∘ tr (Position D) (H s))
+    refl-htpy
+    (λ s → refl-htpy)
+    (λ f → equiv-funext)
+    (λ σ →
+      equiv-Π-equiv-family (λ s →
+        equiv-funext) ∘e
+      equiv-funext)
+    (map-equiv Morphism≃Σ-Morphism γ) ∘e
+  equiv-ap Morphism≃Σ-Morphism η γ
 
 {- The natural transformation given by a morphism -}
 
@@ -201,3 +270,9 @@ pr2 equiv-⊚-∘ =
     (λ (s , v) → ((s , pr1 ∘ v) , λ (p , q) → pr2 (v p) q))
     refl-htpy
     refl-htpy
+
+_⊛_ : Container ℓ₁ ℓ₂
+    → Container ℓ₃ ℓ₄
+    → Container (ℓ₁ ⊔ ℓ₃) (ℓ₂ ⊔ ℓ₄)
+Shape (C ⊛ D) = Shape C × Shape D
+Position (C ⊛ D) (s , t) = Position C s × Position D t

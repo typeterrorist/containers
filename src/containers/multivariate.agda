@@ -11,6 +11,7 @@ open import foundation.functoriality-dependent-pair-types
 open import foundation.homotopies
 open import foundation.identity-types
 open import foundation.structure-identity-principle
+open import foundation.transport-along-identifications
 open import foundation.univalence
 open import foundation.universe-levels
 
@@ -63,9 +64,84 @@ record Morphism {I : UU ℓ₁}
 
 module _ {I : UU ℓ₁} where
 
+  Σ-Morphism : Container ℓ₂ ℓ₃ I
+             → Container ℓ₄ ℓ₅ I
+             → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄ ⊔ ℓ₅)
+  Σ-Morphism (S ◁ P) (T ◁ Q) =
+    Σ (S → T) λ f → ∀ s i → Q (f s) i → P s i
+
+  Morphism≃Σ-Morphism : {C : Container ℓ₂ ℓ₃ I}
+                      → {D : Container ℓ₄ ℓ₅ I}
+                      → Morphism C D ≃ Σ-Morphism C D
+  pr1 Morphism≃Σ-Morphism
+    record { on-shapes = f ; on-positions = σ } = (f , σ)
+  pr2 Morphism≃Σ-Morphism =
+    is-equiv-is-invertible
+      (λ (f , σ) → record { on-shapes = f ; on-positions = σ })
+      refl-htpy
+      refl-htpy
+
   _⇒_ : Container ℓ₂ ℓ₃ I → Container ℓ₄ ℓ₅ I
       → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄ ⊔ ℓ₅)
   _⇒_ = Morphism
+
+{- Equality on morphisms -}
+
+record MorphismEquality {I : UU ℓ₁}
+  {C : Container ℓ₂ ℓ₃ I} {D : Container ℓ₄ ℓ₅ I}
+  (η γ : Morphism C D) : UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄ ⊔ ℓ₅) where
+  field
+    htpy-on-shapes : Morphism.on-shapes η ~ Morphism.on-shapes γ
+    htpy-on-positions : ∀ s i
+                      → Morphism.on-positions η s i
+                      ~ Morphism.on-positions γ s i
+                        ∘ tr (λ t → Position D t i) (htpy-on-shapes s)
+
+module _ {I : UU ℓ₁}
+  {C : Container ℓ₂ ℓ₃ I} {D : Container ℓ₄ ℓ₅ I}
+  where
+
+  Σ-MorphismEquality : Morphism C D
+                     → Morphism C D
+                     → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄ ⊔ ℓ₅)
+  Σ-MorphismEquality η γ =
+    Σ (Morphism.on-shapes η ~ Morphism.on-shapes γ) (λ H →
+      ∀ s i → Morphism.on-positions η s i
+            ~ Morphism.on-positions γ s i ∘ tr (λ t → Position D t i) (H s))
+
+  MorphismEquality≃Σ-MorphismEquality : {η γ : Morphism C D}
+                                      → MorphismEquality η γ
+                                      ≃ Σ-MorphismEquality η γ
+  pr1 MorphismEquality≃Σ-MorphismEquality
+    record { htpy-on-shapes = H ; htpy-on-positions = K } = (H , K)
+  pr2 MorphismEquality≃Σ-MorphismEquality =
+    is-equiv-is-invertible
+      (λ (H , K) → record { htpy-on-shapes = H ; htpy-on-positions = K })
+      refl-htpy
+      refl-htpy
+
+  Id≃MorphismEquality : {η γ : Morphism C D}
+                      → (η ＝ γ)
+                      ≃ MorphismEquality η γ
+  Id≃MorphismEquality {η = η} {γ = γ} =
+    inv-equiv MorphismEquality≃Σ-MorphismEquality ∘e
+    extensionality-Σ
+      (λ σ H → ∀ s i → Morphism.on-positions η s i ~ σ s i ∘ tr (λ t → Position D t i) (H s))
+      refl-htpy
+      (λ s i → refl-htpy)
+      (λ f → equiv-funext)
+      (λ σ →
+        equiv-Π-equiv-family (λ s →
+          equiv-Π-equiv-family (λ i →
+            equiv-funext) ∘e
+          equiv-funext) ∘e
+        equiv-funext)
+      (map-equiv Morphism≃Σ-Morphism γ) ∘e
+    equiv-ap Morphism≃Σ-Morphism η γ
+
+module _ {I : UU ℓ₁} where
+
+  {- The natural transformation given by a morphism -}
 
   transformation-⟦_⟧ : {C : Container ℓ₂ ℓ₃ I} {D : Container ℓ₄ ℓ₅ I}
                      → C ⇒ D
@@ -163,66 +239,72 @@ module _ {I : UU ℓ₁} where
 
 {- Compositions of containers -}
 
+module _ {I : UU ℓ₁} where
+
 {- We define the sum of containers with positions
 in the same universe to avoid having to raise
 universe levels unnecessarily. -}
-_⊕_ : {I : UU ℓ₁}
-    → Container ℓ₂ ℓ₄ I
-    → Container ℓ₃ ℓ₄ I
-    → Container (ℓ₂ ⊔ ℓ₃) ℓ₄ I
-Shape (C ⊕ D) = Shape C + Shape D
-Position (C ⊕ D) (inl s) = Position C s
-Position (C ⊕ D) (inr t) = Position D t
+  _⊕_ : Container ℓ₂ ℓ₄ I
+      → Container ℓ₃ ℓ₄ I
+      → Container (ℓ₂ ⊔ ℓ₃) ℓ₄ I
+  Shape (C ⊕ D) = Shape C + Shape D
+  Position (C ⊕ D) (inl s) = Position C s
+  Position (C ⊕ D) (inr t) = Position D t
 
-equiv-⊕-+ : {I : UU ℓ₁}
-          → {C : Container ℓ₂ ℓ₄ I}
-          → {D : Container ℓ₃ ℓ₄ I}
-          → {X : I → UU ℓ₅}
-          → ⟦ C ⊕ D ⟧ X ≃ ⟦ C ⟧ X + ⟦ D ⟧ X
-pr1 equiv-⊕-+ (inl s , v) = inl (s , v)
-pr1 equiv-⊕-+ (inr t , v) = inr (t , v)
-pr2 equiv-⊕-+ =
-  is-equiv-is-invertible
-    (λ { (inl (s , v)) → (inl s , v) ; (inr (t , v)) → (inr t , v) })
-    (λ { (inl (s , v)) → refl ; (inr (t , v)) → refl })
-    (λ { ((inl s) , v) → refl ; ((inr t) , v) → refl })
+  equiv-⊕-+ : {C : Container ℓ₂ ℓ₄ I}
+            → {D : Container ℓ₃ ℓ₄ I}
+            → {X : I → UU ℓ₅}
+            → ⟦ C ⊕ D ⟧ X ≃ ⟦ C ⟧ X + ⟦ D ⟧ X
+  pr1 equiv-⊕-+ (inl s , v) = inl (s , v)
+  pr1 equiv-⊕-+ (inr t , v) = inr (t , v)
+  pr2 equiv-⊕-+ =
+    is-equiv-is-invertible
+      (λ { (inl (s , v)) → (inl s , v) ; (inr (t , v)) → (inr t , v) })
+      (λ { (inl (s , v)) → refl ; (inr (t , v)) → refl })
+      (λ { ((inl s) , v) → refl ; ((inr t) , v) → refl })
 
-_⊗_ : {I : UU ℓ₁}
-    → Container ℓ₂ ℓ₃ I
-    → Container ℓ₄ ℓ₅ I
-    → Container (ℓ₂ ⊔ ℓ₄) (ℓ₃ ⊔ ℓ₅) I
-Shape (C ⊗ D) = Shape C × Shape D
-Position (C ⊗ D) (s , t) i = Position C s i + Position D t i
+  _⊗_ : Container ℓ₂ ℓ₃ I
+      → Container ℓ₄ ℓ₅ I
+      → Container (ℓ₂ ⊔ ℓ₄) (ℓ₃ ⊔ ℓ₅) I
+  Shape (C ⊗ D) = Shape C × Shape D
+  Position (C ⊗ D) (s , t) i = Position C s i + Position D t i
 
-equiv-⊗-× : {I : UU ℓ₁}
-          → {C : Container ℓ₂ ℓ₃ I}
-          → {D : Container ℓ₄ ℓ₅ I}
-          → {X : I → UU ℓ₆}
-          → ⟦ C ⊗ D ⟧ X ≃ ⟦ C ⟧ X × ⟦ D ⟧ X
-pr1 equiv-⊗-× ((s , t) , v) = ((s , (λ i → v i ∘ inl)) , (t , λ i → v i ∘ inr))
-pr2 equiv-⊗-× =
-  is-equiv-is-invertible
-    (λ ((s , v) , (t , w)) → ((s , t) , λ i → λ { (inl p) → v i p ; (inr q) → w i q }))
-    refl-htpy
-    (λ ((s , t) , v) →
-      eq-pair-Σ refl (eq-htpy (λ i → eq-htpy (λ { (inl p) → refl ; (inr q) → refl }))))
+  equiv-⊗-× : {C : Container ℓ₂ ℓ₃ I}
+            → {D : Container ℓ₄ ℓ₅ I}
+            → {X : I → UU ℓ₆}
+            → ⟦ C ⊗ D ⟧ X ≃ ⟦ C ⟧ X × ⟦ D ⟧ X
+  pr1 equiv-⊗-× ((s , t) , v) = ((s , (λ i → v i ∘ inl)) , (t , λ i → v i ∘ inr))
+  pr2 equiv-⊗-× =
+    is-equiv-is-invertible
+      (λ ((s , v) , (t , w)) → ((s , t) , λ i → λ { (inl p) → v i p ; (inr q) → w i q }))
+      refl-htpy
+      (λ ((s , t) , v) →
+        eq-pair-Σ refl (eq-htpy (λ i → eq-htpy (λ { (inl p) → refl ; (inr q) → refl }))))
 
-_⊚_ : {I : UU ℓ₁} {J : UU ℓ₂}
-    → Container ℓ₃ ℓ₄ I
-    → (I → Container ℓ₅ ℓ₆ J)
-    → Container (ℓ₁ ⊔ ℓ₃ ⊔ ℓ₄ ⊔ ℓ₅) (ℓ₁ ⊔ ℓ₄ ⊔ ℓ₆) J
-Shape (C ⊚ D) = ⟦ C ⟧ (Shape ∘ D)
-Position (C ⊚ D) (s , t) j =
-  Σ _ λ i → Σ (Position C s i) λ p → Position (D i) (t i p) j
+module _ {I : UU ℓ₁} {J : UU ℓ₂} where
 
-equiv-⊚-∘ : {I : UU ℓ₁} {J : UU ℓ₂}
-          → {C : Container ℓ₃ ℓ₄ I}
-          → {D : I → Container ℓ₅ ℓ₆ J}
-          → {X : J → UU ℓ₇}
-          → ⟦ C ⊚ D ⟧ X ≃ ⟦ C ⟧ (λ i → ⟦ D i ⟧ X)
-pr1 equiv-⊚-∘ ((s , t) , v) = (s , λ i p → (t i p , λ j q → v j (i , p , q)))
-pr2 equiv-⊚-∘ =
-  is-equiv-is-invertible
-    (λ (s , v) → ((s , (λ i → pr1 ∘ v i)) , λ j (i , p , q) → pr2 (v i p) j q))
-    refl-htpy
-    refl-htpy
+  _⊚_ : Container ℓ₃ ℓ₄ I
+      → (I → Container ℓ₅ ℓ₆ J)
+      → Container (ℓ₁ ⊔ ℓ₃ ⊔ ℓ₄ ⊔ ℓ₅) (ℓ₁ ⊔ ℓ₄ ⊔ ℓ₆) J
+  Shape (C ⊚ D) = ⟦ C ⟧ (Shape ∘ D)
+  Position (C ⊚ D) (s , t) j =
+    Σ _ λ i → Σ (Position C s i) λ p → Position (D i) (t i p) j
+
+  equiv-⊚-∘ : {C : Container ℓ₃ ℓ₄ I}
+            → {D : I → Container ℓ₅ ℓ₆ J}
+            → {X : J → UU ℓ₇}
+            → ⟦ C ⊚ D ⟧ X ≃ ⟦ C ⟧ (λ i → ⟦ D i ⟧ X)
+  pr1 equiv-⊚-∘ ((s , t) , v) = (s , λ i p → (t i p , λ j q → v j (i , p , q)))
+  pr2 equiv-⊚-∘ =
+    is-equiv-is-invertible
+      (λ (s , v) → ((s , (λ i → pr1 ∘ v i)) , λ j (i , p , q) → pr2 (v i p) j q))
+      refl-htpy
+      refl-htpy
+
+module _ {I : UU ℓ₁} where
+
+  _⊛_ : Container ℓ₂ ℓ₃ I
+      → Container ℓ₄ ℓ₅ I
+      → Container (ℓ₂ ⊔ ℓ₄) (ℓ₃ ⊔ ℓ₅) I
+  Shape (C ⊛ D) = Shape C × Shape D
+  Position (C ⊛ D) (s , t) i = Position C s i × Position D t i

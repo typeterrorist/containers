@@ -12,10 +12,11 @@ open import foundation.functoriality-dependent-pair-types
 open import foundation.homotopies
 open import foundation.identity-types
 open import foundation.structure-identity-principle
+open import foundation.transport-along-identifications
 open import foundation.univalence
 open import foundation.universe-levels
 
-module containers.doubly-indexed where
+module containers.indexed where
 
 private
   variable
@@ -68,10 +69,93 @@ record Morphism {I : UU ℓ₁} {J : UU ℓ₂}
 
 module _ {I : UU ℓ₁} {J : UU ℓ₂} where
 
+  Σ-Morphism : Container ℓ₃ ℓ₄ I J
+             → Container ℓ₅ ℓ₆ I J
+             → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄ ⊔ ℓ₅ ⊔ ℓ₆)
+  Σ-Morphism (S ◁ P) (T ◁ Q) =
+    Σ (∀ i → S i → T i) λ f → ∀ i s j → Q i (f i s) j → P i s j
+
+  Morphism≃Σ-Morphism : {C : Container ℓ₃ ℓ₄ I J}
+                      → {D : Container ℓ₅ ℓ₆ I J}
+                      → Morphism C D ≃ Σ-Morphism C D
+  pr1 Morphism≃Σ-Morphism
+    record { on-shapes = f ; on-positions = σ } = (f , σ)
+  pr2 Morphism≃Σ-Morphism =
+    is-equiv-is-invertible
+      (λ (f , σ) → record { on-shapes = f ; on-positions = σ })
+      refl-htpy
+      refl-htpy
+
   _⇒_ : Container ℓ₃ ℓ₄ I J
       → Container ℓ₅ ℓ₆ I J
       → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄ ⊔ ℓ₅ ⊔ ℓ₆)
   _⇒_ = Morphism
+
+{- Equality on morphisms -}
+
+record MorphismEquality {I : UU ℓ₁} {J : UU ℓ₂}
+  {C : Container ℓ₃ ℓ₄ I J} {D : Container ℓ₅ ℓ₆ I J}
+  (η γ : Morphism C D) : UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄ ⊔ ℓ₅ ⊔ ℓ₆) where
+  field
+    htpy-on-shapes : ∀ i → Morphism.on-shapes η i ~ Morphism.on-shapes γ i
+    htpy-on-positions : ∀ i s j
+                      → Morphism.on-positions η i s j
+                      ~ Morphism.on-positions γ i s j
+                        ∘ tr (λ t → Position D i t j) (htpy-on-shapes i s)
+
+module _ {I : UU ℓ₁} {J : UU ℓ₂}
+  {C : Container ℓ₃ ℓ₄ I J} {D : Container ℓ₅ ℓ₆ I J}
+  where
+
+  Σ-MorphismEquality : Morphism C D
+                     → Morphism C D
+                     → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃ ⊔ ℓ₄ ⊔ ℓ₅ ⊔ ℓ₆)
+  Σ-MorphismEquality η γ =
+    Σ (∀ i → Morphism.on-shapes η i ~ Morphism.on-shapes γ i) (λ H →
+      ∀ i s j → Morphism.on-positions η i s j
+              ~ Morphism.on-positions γ i s j ∘ tr (λ t → Position D i t j) (H i s))
+
+  MorphismEquality≃Σ-MorphismEquality : {η γ : Morphism C D}
+                                      → MorphismEquality η γ
+                                      ≃ Σ-MorphismEquality η γ
+  pr1 MorphismEquality≃Σ-MorphismEquality
+    record { htpy-on-shapes = H ; htpy-on-positions = K } = (H , K)
+  pr2 MorphismEquality≃Σ-MorphismEquality =
+    is-equiv-is-invertible
+      (λ (H , K) → record { htpy-on-shapes = H ; htpy-on-positions = K })
+      refl-htpy
+      refl-htpy
+
+  Id≃MorphismEquality : {η γ : Morphism C D}
+                      → (η ＝ γ)
+                      ≃ MorphismEquality η γ
+  Id≃MorphismEquality {η = η} {γ = γ} =
+    inv-equiv MorphismEquality≃Σ-MorphismEquality ∘e
+    extensionality-Σ
+      (λ σ H →
+        ∀ i s j →
+          Morphism.on-positions η i s j
+          ~ σ i s j ∘ tr (λ t → Position D i t j) (H i s))
+      (λ i → refl-htpy)
+      (λ i s j → refl-htpy)
+      (λ f →
+        equiv-Π-equiv-family (λ i →
+          equiv-funext) ∘e
+        equiv-funext)
+      (λ σ →
+        equiv-Π-equiv-family (λ i →
+          equiv-Π-equiv-family (λ s →
+            equiv-Π-equiv-family (λ j →
+              equiv-funext) ∘e
+            equiv-funext) ∘e
+          equiv-funext) ∘e
+        equiv-funext)
+      (map-equiv Morphism≃Σ-Morphism γ) ∘e
+    equiv-ap Morphism≃Σ-Morphism η γ
+
+module _ {I : UU ℓ₁} {J : UU ℓ₂} where
+
+  {- The natural transformation given by a morphism -}
 
   transformation-⟦_⟧ : {C : Container ℓ₃ ℓ₄ I J} {D : Container ℓ₅ ℓ₆ I J}
                      → C ⇒ D
@@ -249,3 +333,10 @@ module _ {I : UU ℓ₁} {J : UU ℓ₂} {K : UU ℓ₃} where
       refl-htpy
       refl-htpy
 
+module _ {I : UU ℓ₁} {J : UU ℓ₂} where
+
+  _⊛_ : Container ℓ₃ ℓ₄ I J
+      → Container ℓ₅ ℓ₆ I J
+      → Container (ℓ₃ ⊔ ℓ₅) (ℓ₄ ⊔ ℓ₆) I J
+  Shape (C ⊛ D) i = Shape C i × Shape D i 
+  Position (C ⊛ D) i (s , t) j = Position C i s j × Position D i t j
