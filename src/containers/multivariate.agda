@@ -13,6 +13,7 @@ open import foundation.identity-types
 open import foundation.structure-identity-principle
 open import foundation.subtypes
 open import foundation.transport-along-identifications
+open import foundation.unit-type
 open import foundation.univalence
 open import foundation.universe-levels
 
@@ -353,3 +354,17 @@ module _ {I : UU ℓ₁} where
       → Container (ℓ₂ ⊔ ℓ₄) (ℓ₃ ⊔ ℓ₅) I
   Shape (C ⊛ D) = Shape C × Shape D
   Position (C ⊛ D) (s , t) i = Position C s i × Position D t i
+
+{- Multivariate containers are a special case of indexed containers -}
+
+import containers.indexed as indexed
+
+module _ {I : UU ℓ₁} where
+
+  to-indexed : Container ℓ₂ ℓ₃ I ≃ indexed.Container ℓ₂ ℓ₃ unit I
+  pr1 to-indexed (S ◁ P) = (λ _ → S) indexed.◁ (λ _ → P)
+  pr2 to-indexed =
+    is-equiv-is-invertible
+      (λ (S indexed.◁ P) → S star ◁ P star)
+      refl-htpy
+      refl-htpy

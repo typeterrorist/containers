@@ -15,6 +15,7 @@ open import foundation.identity-types
 open import foundation.structure-identity-principle
 open import foundation.subtypes
 open import foundation.transport-along-identifications
+open import foundation.unit-type
 open import foundation.univalence
 open import foundation.universe-levels
 open import foundation.whiskering-homotopies
@@ -316,3 +317,25 @@ _⊛_ : Container ℓ₁ ℓ₂
     → Container (ℓ₁ ⊔ ℓ₃) (ℓ₂ ⊔ ℓ₄)
 Shape (C ⊛ D) = Shape C × Shape D
 Position (C ⊛ D) (s , t) = Position C s × Position D t
+
+{- Univariate containers are a special case of multivariate and indexed containers -}
+
+import containers.multivariate as multivariate
+
+to-multivariate : Container ℓ₁ ℓ₂ ≃ multivariate.Container ℓ₁ ℓ₂ unit
+pr1 to-multivariate (S ◁ P) = S multivariate.◁ (λ s _ → P s)
+pr2 to-multivariate =
+  is-equiv-is-invertible
+    (λ (S multivariate.◁ P) → S ◁ (λ s → P s star))
+    refl-htpy
+    refl-htpy
+
+import containers.indexed as indexed
+
+to-indexed : Container ℓ₁ ℓ₂ ≃ indexed.Container ℓ₁ ℓ₂ unit unit
+pr1 to-indexed (S ◁ P) = (λ _ → S) indexed.◁ (λ _ s _ → P s)
+pr2 to-indexed =
+  is-equiv-is-invertible
+    (λ (S indexed.◁ P) → S star ◁ (λ s → P star s star))
+    refl-htpy
+    refl-htpy
