@@ -1,4 +1,6 @@
+open import foundation.action-on-identifications-functions
 open import foundation.cartesian-product-types
+open import foundation.contractible-types
 open import foundation.coproduct-types
 open import foundation.dependent-pair-types
   renaming (ind-Σ to uncurry; ev-pair to curry)
@@ -16,6 +18,7 @@ open import foundation.subtypes
 open import foundation.transport-along-identifications
 open import foundation.univalence
 open import foundation.universe-levels
+open import foundation.whiskering-homotopies
 
 module containers.indexed where
 
@@ -57,6 +60,13 @@ module _ {I : UU ℓ₁} {J : UU ℓ₂} where
           → (∀ j → X j → Y j)
           → ∀ i → ⟦ C ⟧ X i → ⟦ C ⟧ Y i
   map-⟦ S ◁ P ⟧ f i = tot (λ s v j → f j ∘ v j)
+
+  htpy-map-⟦_⟧ : (C : Container ℓ₃ ℓ₄ I J)
+               → {X : J → UU ℓ₅} {Y : J → UU ℓ₆}
+               → {f g : ∀ j → X j → Y j}
+               → (∀ i → f i ~ g i)
+               → ∀ i → map-⟦ C ⟧ f i ~ map-⟦ C ⟧ g i
+  htpy-map-⟦ C ⟧ H i (s , v) = eq-pair-eq-pr2 (eq-htpy (λ j → eq-htpy (H j ·r v j)))
 
 {- Container morphisms -}
 
@@ -382,3 +392,94 @@ module _ {I : UU ℓ₁} {J : UU ℓ₂} where
       → Container (ℓ₃ ⊔ ℓ₅) (ℓ₄ ⊔ ℓ₆) I J
   Shape (C ⊛ D) i = Shape C i × Shape D i 
   Position (C ⊛ D) i (s , t) j = Position C i s j × Position D i t j
+
+{- Least fixpoint -}
+
+data μ {I : UU ℓ₁} (C : Container ℓ₂ ℓ₃ I I) (i : I) : UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃) where
+  sup : (s : Shape C i)
+      → (∀ i' → (p : Position C i s i') → μ C i')
+      → μ C i
+
+module _ {I : UU ℓ₁} (C : Container ℓ₂ ℓ₃ I I) (i : I) where
+
+  alg-map-μ : ⟦ C ⟧ (μ C) i → μ C i
+  alg-map-μ = uncurry sup
+
+  coalg-map-μ : μ C i → ⟦ C ⟧ (μ C) i
+  coalg-map-μ (sup s v) = (s , v)
+
+  alg-≃-μ : ⟦ C ⟧ (μ C) i ≃ μ C i
+  pr1 alg-≃-μ = alg-map-μ
+  pr2 alg-≃-μ =
+    is-equiv-is-invertible
+      coalg-map-μ
+      (λ { (sup s v) → refl })
+      refl-htpy
+
+module _ {I : UU ℓ₁} (C : Container ℓ₂ ℓ₃ I I)
+  {X : I → UU ℓ₄} (f : ∀ i' → ⟦ C ⟧ X i' → X i')
+  where
+
+  rec-μ : ∀ i → μ C i → X i
+  rec-μ i (sup s v) = f i (s , λ i' p → rec-μ i' (v i' p))
+
+  is-alg-hom-rec-μ : ∀ i
+                   → (f i ∘ map-⟦ C ⟧ rec-μ i)
+                   ~ (rec-μ i ∘ alg-map-μ C i)
+  is-alg-hom-rec-μ i = refl-htpy
+
+  is-unique-rec-μ : (r : ∀ i → μ C i → X i)
+                  → (∀ i → (f i ∘ map-⟦ C ⟧ r i) ~ (r i ∘ alg-map-μ C i))
+                  → ∀ i → rec-μ i ~ r i
+  is-unique-rec-μ r H i (sup s v) =
+    ap (λ v' → f i (s , v'))
+       (eq-htpy (λ i' →
+         eq-htpy (λ p →
+           is-unique-rec-μ r H i' (v i' p)))) ∙
+    H i (s , v)
+
+  Id-alg-hom : {(r , H) (r' , H') :
+                   Σ (∀ i → μ C i → X i) (λ r →
+                     ∀ i → (f i ∘ map-⟦ C ⟧ r i) ~ (r i ∘ alg-map-μ C i))}
+             → ((r , H) ＝ (r' , H'))
+             ≃ Σ (∀ i → r i ~ r' i) (λ α →
+                 ∀ i → H i ∙h (α i ·r alg-map-μ C i)
+                     ~ (f i ·l htpy-map-⟦ C ⟧ α i) ∙h H' i)
+  Id-alg-hom {(r , H)} {(r' , H')} =
+    extensionality-Σ
+      (λ H' α → ∀ i → H i ∙h (α i ·r alg-map-μ C i) ~ (f i ·l htpy-map-⟦ C ⟧ α i) ∙h H' i)
+      (λ i → refl-htpy)
+      (λ i (s , v) →
+        right-unit ∙
+        ap (λ p → ap (f i) (eq-pair-eq-pr2 p) ∙ H i (s , v))
+           (inv (eq-htpy-refl-htpy (λ i' → r i' ∘ v i')) ∙
+           ap eq-htpy
+              (eq-htpy (λ i' → inv (eq-htpy-refl-htpy (r i' ∘ v i'))))))
+      (λ r' →
+        equiv-Π-equiv-family (λ i →
+          equiv-funext) ∘e
+        equiv-funext)
+      (λ H' →
+        equiv-Π-equiv-family (λ i →
+          equiv-concat-htpy (λ (s , v) → right-unit) _ ∘e
+          equiv-concat-htpy' _ (λ (s , v) →
+            ap (λ p → ap (f i) (eq-pair-eq-pr2 p) ∙ H' i (s , v))
+               (inv (eq-htpy-refl-htpy (λ i' → r i' ∘ v i')) ∙
+               ap eq-htpy
+                  (eq-htpy (λ i' →
+                    inv (eq-htpy-refl-htpy (r i' ∘ v i')))))) ∘e
+          equiv-funext) ∘e
+        equiv-funext)
+      (r' , H')
+
+  is-initial-alg-μ : is-contr (Σ (∀ i → μ C i → X i) (λ r →
+                                 ∀ i → (f i ∘ map-⟦ C ⟧ r i) ~ (r i ∘ alg-map-μ C i)))
+  pr1 is-initial-alg-μ = (rec-μ , is-alg-hom-rec-μ)
+  pr2 is-initial-alg-μ (r , H) =
+    map-inv-equiv
+      Id-alg-hom
+      (is-unique-rec-μ r H ,
+      (λ i (s , v) →
+        ap (_∙ H i (s , v))
+           (ap-comp (f i) (λ v' → (s , v')) _)))
+
