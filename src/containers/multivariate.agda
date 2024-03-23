@@ -1,7 +1,10 @@
+open import foundation.action-on-identifications-functions
 open import foundation.cartesian-product-types
+open import foundation.contractible-types
 open import foundation.coproduct-types
 open import foundation.dependent-pair-types
 open import foundation.embeddings
+open import foundation.equality-cartesian-product-types
 open import foundation.equality-dependent-pair-types
 open import foundation.equivalences
 open import foundation.function-extensionality
@@ -10,12 +13,14 @@ open import foundation.functoriality-dependent-function-types
 open import foundation.functoriality-dependent-pair-types
 open import foundation.homotopies
 open import foundation.identity-types
+open import foundation.raising-universe-levels
 open import foundation.structure-identity-principle
 open import foundation.subtypes
 open import foundation.transport-along-identifications
 open import foundation.unit-type
 open import foundation.univalence
 open import foundation.universe-levels
+open import foundation.whiskering-homotopies
 
 module containers.multivariate where
 
@@ -54,6 +59,14 @@ module _ {I : UU ℓ₁} where
           → (∀ i → X i → Y i)
           → ⟦ C ⟧ X → ⟦ C ⟧ Y
   map-⟦ C ⟧ f = tot (λ s → map-Π (λ i → f i ∘_))
+
+  htpy-map-⟦_⟧ : (C : Container ℓ₂ ℓ₃ I)
+               → {X : I → UU ℓ₄} {Y : I → UU ℓ₅}
+               → {f g : ∀ i → X i → Y i}
+               → (∀ i → f i ~ g i)
+               → map-⟦ C ⟧ f ~ map-⟦ C ⟧ g
+  htpy-map-⟦ C ⟧ H (s , v) =
+    eq-pair-eq-pr2 (eq-htpy (λ i → eq-htpy (H i ·r v i)))
 
 {- Container morphisms -}
 
@@ -376,3 +389,310 @@ module _ {I : UU ℓ₁} where
       (λ (S indexed.◁ P) → S star ◁ P star)
       refl-htpy
       refl-htpy
+
+{- Least fixpoint -}
+
+data μShape {I : UU ℓ₁} (C : Container ℓ₂ ℓ₃ (I + unit)) : UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃) where
+  sup : (s : Shape C) → (Position C s (inr star) → μShape C) → μShape C
+
+desup : {I : UU ℓ₁} (C : Container ℓ₂ ℓ₃ (I + unit))
+      → μShape C → Σ (Shape C) (λ s → Position C s (inr star) → μShape C)
+desup C (sup s v) = (s , v)
+
+data μPosition {I : UU ℓ₁} (C : Container ℓ₂ ℓ₃ (I + unit))
+  (s : μShape C) (i : I) :
+  UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃) where
+  supₗ : Position C (pr1 (desup C s)) (inl i) → μPosition C s i
+  supᵣ : (p : Position C (pr1 (desup C s)) (inr star))
+       → μPosition C (pr2 (desup C s) p) i → μPosition C s i
+
+ind-μPosition : {I : UU ℓ₁} {C : Container ℓ₂ ℓ₃ (I + unit)}
+              → {s : μShape C} {i : I}
+              → (Z : μPosition C s i → UU ℓ₄)
+              → ((p : Position C (pr1 (desup C s)) (inl i)) → Z (supₗ p))
+              → ((p : Position C (pr1 (desup C s)) (inr star))
+                → (q : μPosition C (pr2 (desup C s) p) i)
+                → Z (supᵣ p q))
+              → (p : μPosition C s i) → Z p
+ind-μPosition Z f g (supₗ p) = f p
+ind-μPosition Z f g (supᵣ p q) = g p q
+
+{-μPosition' : {I : UU ℓ₁} (C : Container ℓ₂ ℓ₃ (I + unit))
+           → (s : μShape C) (i : I)
+           → UU (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃)
+μPosition' C (sup s t) i =
+  Position C s (inl i) + Σ (Position C s (inr star)) (λ p → μPosition' C (t p) i)
+
+μPosition≃μPosition' : {I : UU ℓ₁} {C : Container ℓ₂ ℓ₃ (I + unit)}
+                     → (s : μShape C) (i : I)
+                     → μPosition C s i
+                     ≃ μPosition' C s i
+pr1 (μPosition≃μPosition' (sup s t) i) (supₗ p) = inl p
+pr1 (μPosition≃μPosition' (sup s t) i) (supᵣ p q) = inr (p , map-equiv (μPosition≃μPosition' (t p) i) q)
+pr2 (μPosition≃μPosition' (sup s t) i) =
+  is-equiv-is-invertible
+    {!!}
+    {!!}
+    {!!}-}
+  
+
+module _ {I : UU ℓ₁} where
+
+  μ : Container ℓ₂ ℓ₃ (I + unit) → Container (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃) (ℓ₁ ⊔ ℓ₂ ⊔ ℓ₃) I
+  μ C = μShape C ◁ μPosition C
+
+  _,,_ : (I → UU ℓ₁)
+       → UU ℓ₁
+       → I + unit → UU ℓ₁
+  X ,, Y = ind-coprod _ X (λ _ → Y)
+  {-(X ,, Y) (inl i) = X i
+  (X ,, Y) (inr _) = Y-}
+
+  foo : (X : I → UU ℓ₁)
+      → (Y : UU ℓ₁)
+      → (X ,, Y) ＝ ind-coprod _ X (λ _ → Y)
+  foo X Y = refl
+
+  id,, : {X : I → UU ℓ₁}
+       → {Y Z : UU ℓ₁}
+       → (Y → Z)
+       → ∀ i → (X ,, Y) i → (X ,, Z) i
+  id,, f = ind-coprod _ (λ i → id) (λ _ → f)
+  {-id,, f (inl i) = id
+  id,, f (inr _) = f-}
+
+  id,,~ : {X : I → UU ℓ₁}
+        → {Y Z : UU ℓ₁}
+        → {f g : Y → Z}
+        → f ~ g
+        → ∀ i → (id,, {X = X} f) i ~ (id,, g) i
+  id,,~ H = ind-coprod _ (λ i → refl-htpy) (λ _ → H)
+  {-id,,~ H (inl i) = refl-htpy
+  id,,~ H (inr _) = H-}
+
+
+{- We show initiality for containers and families in
+the same universe to avoid having to raise universe
+levels unnecessarily. -}
+module _ {I : UU ℓ₁} (C : Container ℓ₁ ℓ₁ (I + unit))
+  (X : I → UU ℓ₁) where
+
+  alg-map-μ : ⟦ C ⟧ (X ,, ⟦ μ C ⟧ X) → ⟦ μ C ⟧ X -- 1 + A × List A → List A
+  alg-map-μ (s , v) =
+    (sup s (pr1 ∘ v (inr star)) ,
+    (λ i →
+      ind-μPosition _
+        (v (inl i))
+        (λ p q → pr2 (v (inr star) p) i q)))
+      {-λ { (supₗ p) → v (inl i) p ;
+          (supᵣ p q) → pr2 (v (inr star) p) i q }))-}
+
+  coalg-map-μ : ⟦ μ C ⟧ X → ⟦ C ⟧ (X ,, ⟦ μ C ⟧ X)
+  coalg-map-μ (sup s t , v) =
+    (s ,
+    ind-coprod _
+      (λ i p → v i (supₗ p))
+      (λ _ p → (t p , λ i q → v i (supᵣ p q))))
+    {-λ { (inl i) p → v i (supₗ p) ;
+        (inr star) p → (t p , λ i q → v i (supᵣ p q)) })-}
+
+  alg-≃-μ : ⟦ C ⟧ (X ,, ⟦ μ C ⟧ X) ≃ ⟦ μ C ⟧ X
+  pr1 alg-≃-μ = alg-map-μ
+  pr2 alg-≃-μ =
+    is-equiv-is-invertible
+      coalg-map-μ
+      (λ { (sup s t , v) →
+             eq-pair-eq-pr2
+               (eq-htpy (λ i →
+                 eq-htpy
+                   (ind-μPosition _ refl-htpy (λ p → refl-htpy)))) })
+                   {-(λ { (supₗ p) → refl ; (supᵣ p q) → refl }))) })-}
+      (λ (s , v) →
+           eq-pair-eq-pr2
+             (eq-htpy
+               (ind-coprod _ refl-htpy refl-htpy)))
+               {-(λ { (inl i) → refl ; (inr star) → refl })))-}
+
+module _ {I : UU ℓ₁} (C : Container ℓ₁ ℓ₁ (I + unit))
+  (X : I → UU ℓ₁)
+  {Y : UU ℓ₁} (f : ⟦ C ⟧ (X ,, Y) → Y) where
+
+  rec-μ : ⟦ μ C ⟧ X → Y
+  rec-μ (s , v) = curried-rec-μ s v
+    where
+      curried-rec-μ : (s : μShape C)
+                    → (∀ i → μPosition C s i → X i)
+                    → Y
+      curried-rec-μ (sup s t) v =
+        f (s ,
+          ind-coprod _
+            (λ i p → v i (supₗ p))
+            (λ _ p → curried-rec-μ (t p) (λ i q → v i (supᵣ p q))))
+          {-λ { (inl i) p → v i (supₗ p) ;
+           (inr star) p → curried-rec-μ (t p) (λ i q → v i (supᵣ p q)) })-}
+
+  is-alg-hom-rec-μ : (f ∘ map-⟦ C ⟧ (id,, rec-μ))
+                   ~ (rec-μ ∘ alg-map-μ C X)
+  is-alg-hom-rec-μ (s , v) =
+    ap f
+       (eq-pair-eq-pr2
+         (eq-htpy (ind-coprod _ (λ i → refl) (λ _ → refl))))
+                  --(λ { (inl i) → refl ; (inr star) → refl })))
+
+  is-unique-rec-μ : (r : ⟦ μ C ⟧ X → Y)
+                  → (f ∘ map-⟦ C ⟧ (id,, r)) ~ (r ∘ alg-map-μ C X)
+                  → rec-μ ~ r
+  is-unique-rec-μ r H (s , v) = curried-is-unique-rec-μ s v
+    where
+      curried-is-unique-rec-μ : (s : μShape C)
+                              → (v : ∀ i → μPosition C s i → X i)
+                              → rec-μ (s , v) ＝ r (s , v)
+      curried-is-unique-rec-μ (sup s t) v =
+        ap (λ v' → f (s , v'))
+           (eq-htpy
+             (ind-coprod _
+               refl-htpy
+               (λ _ → eq-htpy (λ p → curried-is-unique-rec-μ (t p) (λ i q → v i (supᵣ p q) ))))) ∙
+             {-(λ { (inl i) → refl ;
+                  (inr star) → eq-htpy (λ p → curried-is-unique-rec-μ (t p) (λ i q → v i (supᵣ p q) )) })) ∙-}
+        H (coalg-map-μ C X (sup s t , v)) ∙
+        ap r
+           (eq-pair-eq-pr2
+             (eq-htpy (λ i →
+               eq-htpy
+                 (ind-μPosition _ refl-htpy (λ p → refl-htpy)))))
+                 --(λ { (supₗ p) → refl ; (supᵣ p q) → refl }))))
+
+  Id-alg-hom : {(r , H) (r' , H') :
+                   Σ (⟦ μ C ⟧ X → Y) (λ r → (f ∘ map-⟦ C ⟧ (id,, r)) ~ (r ∘ alg-map-μ C X))}
+             → ((r , H) ＝ (r' , H'))
+             ≃ Σ (r ~ r') (λ α →
+                 H ∙h (α ·r alg-map-μ C X) ~
+                 (f ·l htpy-map-⟦ C ⟧ (id,,~ α)) ∙h H')
+  Id-alg-hom {(r , H)} {(r' , H')} =
+    extensionality-Σ
+      (λ H' α →
+        H ∙h (α ·r alg-map-μ C X) ~
+        (f ·l htpy-map-⟦ C ⟧ (id,,~ α)) ∙h H')
+      refl-htpy
+      (λ (s , v) →
+        right-unit ∙
+        ap (λ p → ap f (eq-pair-eq-pr2 p) ∙ H (s , v))
+           (inv (eq-htpy-refl-htpy (λ i → id,, r i ∘ v i)) ∙
+           ap eq-htpy
+              (eq-htpy
+                (λ { (inl i) → inv (eq-htpy-refl-htpy (v (inl i))) ;
+                     (inr star) → inv (eq-htpy-refl-htpy (r ∘ v (inr star))) }))))
+      (λ r' → equiv-funext)
+      (λ H' →
+        equiv-concat-htpy (λ (s , v) → right-unit) _ ∘e
+        equiv-concat-htpy' _ (λ (s , v) →
+          ap (λ p → ap f (eq-pair-eq-pr2 p) ∙ H' (s , v))
+             (inv (eq-htpy-refl-htpy (λ i → id,, r i ∘ v i)) ∙
+             ap eq-htpy
+                (eq-htpy
+                  (λ { (inl i) → inv (eq-htpy-refl-htpy (v (inl i))) ;
+                       (inr star) → inv (eq-htpy-refl-htpy (r ∘ v (inr star))) })))) ∘e
+        equiv-funext)
+      (r' , H')
+
+  is-initial-alg-μ : is-contr (Σ (⟦ μ C ⟧ X → Y) (λ r →
+                                 (f ∘ map-⟦ C ⟧ (id,, r)) ~ (r ∘ alg-map-μ C X)))
+  pr1 is-initial-alg-μ = (rec-μ , is-alg-hom-rec-μ)
+  pr2 is-initial-alg-μ (r , H) =
+    map-inv-equiv
+      Id-alg-hom
+      (is-unique-rec-μ r H ,
+      (λ (s , v) →
+
+    equational-reasoning
+      (is-alg-hom-rec-μ (s , v) ∙ (is-unique-rec-μ r H ·r alg-map-μ C X) (s , v))
+      ＝ ap f (eq-pair-eq-pr2
+               (eq-htpy (ind-coprod _ refl-htpy refl-htpy))) ∙
+        (is-unique-rec-μ r H ·r alg-map-μ C X) (s , v)                           by refl
+      ＝ ap f (eq-pair-eq-pr2
+               (eq-htpy (ind-coprod _ refl-htpy refl-htpy))) ∙
+        (is-unique-rec-μ r H (alg-map-μ C X (s , v)))                           by refl
+      ＝ ap f (eq-pair-eq-pr2
+               (eq-htpy (ind-coprod _ refl-htpy refl-htpy))) ∙
+        (ap (λ v' → f (s , v'))
+           (eq-htpy
+             (ind-coprod _
+               refl-htpy
+               (λ _ → eq-htpy (λ p → is-unique-rec-μ r H (pr1 (v (inr star) p) , (λ i q → pr2 (v (inr star) p) i q)))))) ∙
+        H (coalg-map-μ C X (alg-map-μ C X (s , v))) ∙
+        ap r
+           (eq-pair-eq-pr2
+             (eq-htpy (λ i →
+               eq-htpy
+                 (ind-μPosition _ refl-htpy (λ p → refl-htpy)))))) by refl
+      ＝ ap f (eq-pair-eq-pr2
+               (eq-htpy (ind-coprod _ refl-htpy refl-htpy))) ∙
+        (ap (λ v' → f (s , v'))
+           (eq-htpy
+             (ind-coprod _
+               refl-htpy
+               (λ _ → eq-htpy (λ p → is-unique-rec-μ r H (pr1 (v (inr star) p) , (λ i q → pr2 (v (inr star) p) i q)))))) ∙
+        H (coalg-map-μ C X (alg-map-μ C X (s , v))) ∙
+        ap r (eq-pair-eq-pr2 refl)) by ap (λ α → ap f (eq-pair-eq-pr2
+                                                         (eq-htpy (ind-coprod _ refl-htpy refl-htpy))) ∙ ((ap (λ v' → f (s , v'))
+                                                                                      (eq-htpy
+                                                                                        (ind-coprod _
+                                                                                          refl-htpy
+                                                                                          (λ _ → eq-htpy (λ p → is-unique-rec-μ r H (pr1 (v (inr star) p) , (λ i q → pr2 (v (inr star) p) i q)))))) ∙
+                                                                                   H (coalg-map-μ C X (alg-map-μ C X (s , v)))) ∙ ap r (eq-pair-eq-pr2 α)))
+                                                                                                  (ap eq-htpy (eq-htpy (λ i →
+                                                                                                    ap eq-htpy (eq-htpy
+                                                                                                      (ind-μPosition _ refl-htpy (λ p → refl-htpy))) ∙
+                                                                                                    eq-htpy-refl-htpy _)) ∙
+                                                                                                  eq-htpy-refl-htpy _)
+      ＝ ap f (eq-pair-eq-pr2
+               (eq-htpy (ind-coprod _ refl-htpy refl-htpy))) ∙
+        (ap (λ v' → f (s , v'))
+           (eq-htpy
+             (ind-coprod _
+               refl-htpy
+               (λ _ → eq-htpy (λ p → is-unique-rec-μ r H (pr1 (v (inr star) p) , (λ i q → pr2 (v (inr star) p) i q)))))) ∙
+        H (coalg-map-μ C X (alg-map-μ C X (s , v)))) by ap (ap f (eq-pair-eq-pr2
+                                               (eq-htpy (ind-coprod _ refl-htpy refl-htpy))) ∙_)
+                                                          right-unit
+      ＝ ap f (eq-pair-eq-pr2
+               (eq-htpy (ind-coprod _ refl-htpy refl-htpy))) ∙
+        ap (λ v' → f (s , v'))
+           (eq-htpy
+             (ind-coprod _
+               refl-htpy
+               (λ _ → eq-htpy (λ p → is-unique-rec-μ r H (pr1 (v (inr star) p) , (λ i q → pr2 (v (inr star) p) i q)))))) ∙
+        H (coalg-map-μ C X (alg-map-μ C X (s , v))) by inv (assoc _ _ _)
+      ＝ ap (λ v' → f (s , v'))
+               (eq-htpy (ind-coprod _ refl-htpy refl-htpy)) ∙
+        ap (λ v' → f (s , v'))
+           (eq-htpy
+             (ind-coprod _
+               refl-htpy
+               (λ _ → eq-htpy (λ p → is-unique-rec-μ r H (pr1 (v (inr star) p) , (λ i q → pr2 (v (inr star) p) i q)))))) ∙
+        H (coalg-map-μ C X (alg-map-μ C X (s , v))) by ap (λ α → α ∙ ap (λ v' → f (s , v'))
+                                 (eq-htpy
+                                   (ind-coprod _
+                                     refl-htpy
+                                     (λ _ → eq-htpy (λ p → is-unique-rec-μ r H (pr1 (v (inr star) p) , (λ i q → pr2 (v (inr star) p) i q)))))) ∙
+                              H (coalg-map-μ C X (alg-map-μ C X (s , v)))) (inv (ap-comp f (λ v' → (s , v')) _))
+      ＝ ap (λ v' → f (s , v'))
+          (eq-htpy (ind-coprod _ refl-htpy refl-htpy) ∙
+          eq-htpy
+             (ind-coprod _
+               refl-htpy
+               (λ _ → eq-htpy (λ p → is-unique-rec-μ r H (pr1 (v (inr star) p) , (λ i q → pr2 (v (inr star) p) i q)))))) ∙
+        H (coalg-map-μ C X (alg-map-μ C X (s , v))) by ap (_∙ H (coalg-map-μ C X (alg-map-μ C X (s , v))))
+                                                          (inv (ap-concat (λ v' → f (s , v')) _ _))
+      ＝ ap (λ v' → f (s , v'))
+               (eq-htpy (λ i → eq-htpy ((id,,~ (is-unique-rec-μ r H)) i ·r v i))) ∙
+         H (s , v) by {!!}
+      ＝ ap f (eq-pair-eq-pr2
+               (eq-htpy (λ i → eq-htpy ((id,,~ (is-unique-rec-μ r H)) i ·r v i)))) ∙
+         H (s , v) by ap (_∙ H (s , v)) (ap-comp f (λ v' → (s , v')) _)
+      ＝ ap f (htpy-map-⟦ C ⟧ (id,,~ (is-unique-rec-μ r H)) (s , v)) ∙ H (s , v) by refl
+      ＝ (f ·l htpy-map-⟦ C ⟧ (id,,~ (is-unique-rec-μ r H))) (s , v) ∙ H (s , v) by refl
+    ))
+
+
