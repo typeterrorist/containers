@@ -282,10 +282,11 @@ module _ {I : UU ℓ₁} where
         (equiv-inv P P'))
       (T , Q) ∘e
     equiv-ap Container≃Σ-Container (S ◁ P) (T ◁ Q)
-
+{-
 δ : (ℓ₂ ℓ₃ : Level) {I : UU ℓ₁} → I → Container ℓ₂ (ℓ₁ ⊔ ℓ₃) I
 Shape (δ ℓ₂ ℓ₃ i) = raise-unit ℓ₂
 Position (δ ℓ₂ ℓ₃ i) _ i' = raise ℓ₃ (i ＝ i')
+-}
 
 δ₀ : {I : UU ℓ₁} → I → Container lzero ℓ₁ I
 Shape (δ₀ i) = unit
