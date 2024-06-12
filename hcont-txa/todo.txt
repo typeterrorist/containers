@@ -1,0 +1,16 @@
+
+- Show that HCont is a model of simply typed lambda calculus
+- define the morphism part
+  show univalence (no quoteinet needed)
+- define container morphisms - completeness?
+- show that this a 2-category
+- define μ and ν : (A → A) → A
+   given f : A → A then we μ F : A
+   Q : not sound wrt set semantics
+- add dependency ?
+- internalize coinductive function space
+  (restrict the position to FinSet)
+  F : Set f→ Set |- Arr F : (Set → Set) → (Set → Set)
+  μ F -> _ ~ ν (Arr F)
+  Can this be generalized for higher types?
+
